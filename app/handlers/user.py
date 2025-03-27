@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 import app.keyboards.UserKb as kbus
-from app.database.requests import get_user, set_user, update_user, del_user
+from app.database.requests import get_user, set_user, update_user, del_user, get_service, get_date, get_free_time
 from config import main_photo, reg_sticker
 import app.keyboards.UserConf as US
 from app.state import RegUser, UpdateUser, ReserveService
@@ -28,7 +28,7 @@ async def start(message: Message, state: FSMContext):
         await MainMenu(message, message.from_user.id)
     else:
         await message.answer_sticker(reg_sticker)
-        await message.answer("Регистрируемся?", reply_markup=kbus.keyboard(US.answer("reg1", "reg_0"), 2))
+        await message.answer("Регистрируемся?", reply_markup=kbus.keyboard(US.answer("reg_1", "reg_0"), 2))
 #endregion
 
 
@@ -43,7 +43,7 @@ async def register(callback: CallbackQuery, state: FSMContext):
 
     else:
         await callback.message.answer("ту-ту-ту")
-        await callback.message.answer("Может все таки?", reply_markup=kbus.keyboard(US.answer("reg1", "reg_0"), 2))
+        await callback.message.answer("Может все таки?", reply_markup=kbus.keyboard(US.answer("reg_1", "reg_0"), 2))
 
 
 @router_user.message(RegUser.name)
@@ -67,7 +67,7 @@ async def setting(callback: CallbackQuery):
         await callback.message.answer("Выбери что хочешь изменить", reply_markup=kbus.keyboard(US.settings, 1))
     else:
         await callback.message.answer("Похоже, вы еще не зарегистрированы /n Регистрируемся?", 
-                                      reply_markup=kbus.keyboard(US.answer("reg1", "reg_0"), 2))
+                                      reply_markup=kbus.keyboard(US.answer("reg_1", "reg_0"), 2))
 
 
 @router_user.callback_query(F.data.startswith("change_"))
@@ -101,7 +101,7 @@ async def delete_user(callback: CallbackQuery, state: FSMContext):
     check = callback.data.split('_')[1]
     if check == '1':
         if await del_user(callback.from_user.id):
-            await callback.message.answer("Регистрируемся?", reply_markup=kbus.keyboard(US.answer("reg1", "reg_0"), 2))
+            await callback.message.answer("Регистрируемся?", reply_markup=kbus.keyboard(US.answer("reg_1", "reg_0"), 2))
 
     else:
         await callback.message.answer("Настройки", reply_markup=kbus.keyboard(US.settings, 1))
@@ -110,13 +110,46 @@ async def delete_user(callback: CallbackQuery, state: FSMContext):
 #endregion
 
 
-#region ReservService
+#region ReserveService
 @router_user.callback_query(F.data.startswith('zap'))
 async def choice_service(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
     await state.set_state(ReserveService.service)
+    await callback.message.answer("Выбирай услугу:", reply_markup=kbus.keyboard(await get_service(), 2))
     
+@router_user.callback_query(ReserveService.service)
+async def choice_date(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(ReserveService.day)
+    await callback.message.delete()
+    await callback.answer()
+    await state.update_data(service=callback.data.split('_')[1])
+    await state.update_data(time_work=callback.data.split('_')[2])
+    text = await get_date(3)
+    text["Назад"] = "zap"
+    await callback.message.answer("Доступные записи:", reply_markup=kbus.keyboard(text, 2))
+
+@router_user.callback_query(ReserveService.day)
+async def choice_time(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(ReserveService.time_start)
+    await callback.message.delete()
+    await callback.answer()
+    await state.update_data(day=callback.data.split('_')[1])
+    text = await get_free_time(callback.data.split('_')[1], 2)
+    await callback.message.answer("Доступное время:", reply_markup=kbus.keyboard(text, 2))
+
+
+@router_user.callback_query(ReserveService.time_start)
+async def apply_reserve(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.update_data(day_id=callback.data.split('_')[2])
+    await state.update_data(time_start=callback.data.split('_')[1])
+    data = await state.get_data()
+    await callback.message.answer(f"Вы записались на Комплекс {data['service']}\n"
+                                f"на {data['day']} в {data['time_start']}:00")
+
+
 
 
 #endregion

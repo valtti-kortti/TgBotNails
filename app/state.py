@@ -11,4 +11,6 @@ class UpdateUser(StatesGroup):
 class ReserveService(StatesGroup):
     service = State()
     day = State()
-    time = State()
+    time_start = State()
+    time_work = State()
+    day_id = State()

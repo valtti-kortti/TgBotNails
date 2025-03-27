@@ -33,7 +33,8 @@ class DateWork(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     date: Mapped[str] = mapped_column(String(15))
-    timework: Mapped[int] = mapped_column(Integer)
+    start: Mapped[int] = mapped_column(Integer)
+    end: Mapped[int] = mapped_column(Integer)
 
 
 class Reserve(Base):
