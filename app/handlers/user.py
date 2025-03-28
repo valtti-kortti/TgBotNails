@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 import app.keyboards.UserKb as kbus
-from app.database.requests import get_user, set_user, update_user, del_user, get_service, get_date, get_free_time
+from app.database.requests import get_user, set_user, update_user, del_user, get_service, get_date, get_free_time, set_reserve
 from config import main_photo, reg_sticker
 import app.keyboards.UserConf as US
 from app.state import RegUser, UpdateUser, ReserveService
@@ -125,7 +125,7 @@ async def choice_date(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.update_data(service=callback.data.split('_')[1])
     await state.update_data(time_work=callback.data.split('_')[2])
-    text = await get_date(3)
+    text = await get_date(int(callback.data.split('_')[2]))
     text["Назад"] = "zap"
     await callback.message.answer("Доступные записи:", reply_markup=kbus.keyboard(text, 2))
 
@@ -135,7 +135,8 @@ async def choice_time(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
     await state.update_data(day=callback.data.split('_')[1])
-    text = await get_free_time(callback.data.split('_')[1], 2)
+    data = await  state.get_data()
+    text = await get_free_time(callback.data.split('_')[1], int(data["time_work"]))
     await callback.message.answer("Доступное время:", reply_markup=kbus.keyboard(text, 2))
 
 
@@ -145,11 +146,26 @@ async def apply_reserve(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.update_data(day_id=callback.data.split('_')[2])
     await state.update_data(time_start=callback.data.split('_')[1])
+    await state.set_state(ReserveService.day_id)
     data = await state.get_data()
-    await callback.message.answer(f"Вы записались на Комплекс {data['service']}\n"
-                                f"на {data['day']} в {data['time_start']}:00")
+    await callback.message.answer(f"Подтверждаете запись?\n" 
+                                f"Комплекс {data['service']} на {data['day']} в {data['time_start']}:00", reply_markup=kbus.keyboard(US.answer("done_1", "done_0"), 2))
+    
 
-
+@router_user.callback_query(ReserveService.day_id)
+async def done_reserv(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    answer = callback.data.split('_')[1]
+    if answer == '1':
+        data = await state.get_data()
+        reserve = await set_reserve(callback.from_user.id, data["service"], data["day_id"], data['time_start'], data['time_work'])
+        if reserve:
+            await state.clear()
+            await callback.message.answer("Твоя записи сохранилась", reply_markup=kbus.keyboard(US.main_menu, 2))
+        else:
+            await state.clear()
+            await callback.message.answer("Что-то случило попробуй заново!", reply_markup=kbus.keyboard(US.main_menu, 2))
 
 
 #endregion
