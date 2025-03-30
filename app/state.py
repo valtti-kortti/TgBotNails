@@ -14,3 +14,44 @@ class ReserveService(StatesGroup):
     time_start = State()
     time_work = State()
     day_id = State()
+    name_service = State()
+
+class DeleteAdminReserve(StatesGroup):
+    reserve_id = State()
+    apply = State()
+
+
+class ReserveServiceAdmin(StatesGroup):
+    service = State()
+    day = State()
+    time_start = State()
+    time_work = State()
+    day_id = State()
+    name_service = State()
+
+
+class Newsletter(StatesGroup):
+    text = State()
+    photo = State()
+    photo_2 = State()
+    text_2 = State()
+
+class NewMedia(StatesGroup):
+    main = State()
+    price = State()
+
+class ChangeService(StatesGroup):
+    name = State()
+    time = State()
+    price = State()
+    id_ser = State()
+
+class NewService(StatesGroup):
+    name = State()
+    time = State()
+    price = State()
+    id_ser = State()
+
+class DeleteService(StatesGroup):
+    id_service = State()
+    rec = State()

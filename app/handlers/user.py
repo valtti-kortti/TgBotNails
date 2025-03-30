@@ -1,11 +1,13 @@
 from aiogram import Router, Bot, F
 from aiogram.types import Message, CallbackQuery
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 
 import app.keyboards.UserKb as kbus
-from app.database.requests import get_user, set_user, update_user, del_user, get_service, get_date, get_free_time, set_reserve
-from config import main_photo, reg_sticker
+from app.database.requests import (get_user, set_user, update_user, del_user, 
+        get_service, get_date, get_free_time, set_reserve, 
+        get_reserve, del_reserve, get_media)
+from config import reg_sticker
 import app.keyboards.UserConf as US
 from app.state import RegUser, UpdateUser, ReserveService
 
@@ -14,7 +16,15 @@ router_user = Router()
 #region MainMenu
 async def MainMenu(message: Message, tg_id):
     user = await get_user(tg_id)
-    await message.answer_photo(main_photo, f"Привет, {user}", reply_markup=kbus.keyboard(US.main_menu, 2))
+    await message.answer_photo(await get_media("main"), f"Привет, {user}", reply_markup=kbus.keyboard(US.main_menu, 2))
+
+
+@router_user.callback_query(F.data.startswith('mainmenu1'))
+async def call_main(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.clear()
+    await MainMenu(callback.message, callback.from_user.id)
 #endregion
 
 
@@ -116,18 +126,38 @@ async def choice_service(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
     await state.set_state(ReserveService.service)
-    await callback.message.answer("Выбирай услугу:", reply_markup=kbus.keyboard(await get_service(), 2))
+    text = await get_service()
+    if text:
+        text["Отмена"] = "mainmenu1"
+        await callback.message.answer_photo(await get_media("price"), "Выбирай услугу:", reply_markup=kbus.keyboard(text, 2))
+    else:
+        await callback.message.answer("Извини, но сейчас рабочих дней нет(", reply_markup=kbus.keyboard({"Ок": "mainmenu1"}, 1))
     
-@router_user.callback_query(ReserveService.service)
+@router_user.callback_query(StateFilter(ReserveService.service))
 async def choice_date(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ReserveService.day)
     await callback.message.delete()
     await callback.answer()
+    await state.update_data(name_service=callback.data.split('_')[3])
     await state.update_data(service=callback.data.split('_')[1])
-    await state.update_data(time_work=callback.data.split('_')[2])
+    await state.update_data(time_work=callback.data.split('_')[2]) 
     text = await get_date(int(callback.data.split('_')[2]))
     text["Назад"] = "zap"
+    text["Отмена"] = "mainmenu1"
     await callback.message.answer("Доступные записи:", reply_markup=kbus.keyboard(text, 2))
+
+
+@router_user.callback_query(F.data.startswith('back12'))
+async def choice_date(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(ReserveService.day)
+    await callback.message.delete()
+    await callback.answer()
+    data = await state.get_data()
+    text = await get_date(int(data["time_work"]))
+    text["Назад"] = "zap"
+    text["Отмена"] = "mainmenu1"
+    await callback.message.answer("Доступные записи:", reply_markup=kbus.keyboard(text, 2))
+
 
 @router_user.callback_query(ReserveService.day)
 async def choice_time(callback: CallbackQuery, state: FSMContext):
@@ -137,6 +167,8 @@ async def choice_time(callback: CallbackQuery, state: FSMContext):
     await state.update_data(day=callback.data.split('_')[1])
     data = await  state.get_data()
     text = await get_free_time(callback.data.split('_')[1], int(data["time_work"]))
+    text["Отмена"] = "mainmenu1"
+    text["Назад"] = "back12"
     await callback.message.answer("Доступное время:", reply_markup=kbus.keyboard(text, 2))
 
 
@@ -149,11 +181,12 @@ async def apply_reserve(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ReserveService.day_id)
     data = await state.get_data()
     await callback.message.answer(f"Подтверждаете запись?\n" 
-                                f"Комплекс {data['service']} на {data['day']} в {data['time_start']}:00", reply_markup=kbus.keyboard(US.answer("done_1", "done_0"), 2))
+                                f"{data['name_service']} на {data['day']} в {data['time_start']}:00", 
+                                reply_markup=kbus.keyboard(US.answer("done_1", "done_0"), 2))
     
 
 @router_user.callback_query(ReserveService.day_id)
-async def done_reserv(callback: CallbackQuery, state: FSMContext):
+async def done_reserve(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
     answer = callback.data.split('_')[1]
@@ -162,13 +195,63 @@ async def done_reserv(callback: CallbackQuery, state: FSMContext):
         reserve = await set_reserve(callback.from_user.id, data["service"], data["day_id"], data['time_start'], data['time_work'])
         if reserve:
             await state.clear()
+            await callback.bot.send_message(chat_id=6812714026, text=f" Пользователь {await get_user(callback.from_user.id)}\n"
+                                            f"{data['name_service']} на {data['day']} в {data['time_start']}:00")
             await callback.message.answer("Твоя записи сохранилась", reply_markup=kbus.keyboard(US.main_menu, 2))
         else:
             await state.clear()
             await callback.message.answer("Что-то случило попробуй заново!", reply_markup=kbus.keyboard(US.main_menu, 2))
+#endregion
+
+
+#region DelReserve
+@router_user.callback_query(F.data.startswith("antizap"))
+async def choice_del_res(callback: CallbackQuery):
+    await callback.message.delete()
+    await callback.answer()
+    text = await get_reserve(callback.from_user.id)
+    if text:
+        text["Отмена"] = "mainmenu1"
+        await callback.message.answer("Выберите запись, которую хотите отменить:", reply_markup=kbus.keyboard(text, 1))
+    else:
+        await callback.message.answer("Записей не найдено", reply_markup=kbus.keyboard(US.main_menu, 2))
+
+@router_user.callback_query(F.data.startswith("dateId_"))
+async def apply_del_reserve(callback: CallbackQuery, state: FSMContext):
+    reserve_id = callback.data.split("_")[1]
+    await callback.message.delete()
+    await callback.answer()
+    if await del_reserve(reserve_id):
+        await callback.message.answer("Ваша запись удалена")
+    else:
+        await callback.message.answer("Упс что-то не так!")
+    await MainMenu(callback.message, callback.from_user.id)
+
 
 
 #endregion
+
+
+#region ReturnReserve
+@router_user.callback_query(F.data.startswith("myzap"))
+async def return_reserve(callback: CallbackQuery):
+    await callback.message.delete()
+    await callback.answer()
+    text = await get_reserve(callback.from_user.id)
+    if text:
+        await callback.message.answer(f"{US.answer_text(text)}", reply_markup=kbus.keyboard({"Ок": "mainmenu1"}, 1))
+    else:
+        await callback.message.answer("Вы еще не записаны", reply_markup=kbus.keyboard({"Ок": "mainmenu1"}, 1))
+#endregion
+
+
+#region PriceList
+@router_user.callback_query(F.data.startswith("price_list"))
+async def return_priceList(callback: CallbackQuery):
+    await callback.message.answer_photo(await get_media("price"), reply_markup=kbus.keyboard({"Ок": "mainmenu1"}, 1))
+
+#endregion
+
 # @router_user.message(F.sticker)
 # async def update_sticker(message: Message):
 #     file_id = message.sticker.file_id

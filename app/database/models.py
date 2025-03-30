@@ -1,4 +1,4 @@
-from sqlalchemy import String, Integer, BigInteger, ForeignKey, Boolean
+from sqlalchemy import String, Integer, BigInteger, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine, AsyncSession
 
@@ -46,7 +46,6 @@ class Reserve(Base):
     time_work_id: Mapped[int] = mapped_column(Integer)
     time_start: Mapped[int] = mapped_column(Integer, nullable=True)
     time: Mapped[int] = mapped_column(Integer, nullable=True)
-    reserve: Mapped[bool] = mapped_column(Boolean)
 
 
 class Media(Base):
@@ -54,7 +53,7 @@ class Media(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     appointment: Mapped[str] = mapped_column(String(10))
-    url: Mapped[str] = mapped_column(String(10))
+    url: Mapped[str] = mapped_column(Text)
 
 
 async def async_main():
