@@ -1,16 +1,18 @@
-from aiogram import Router, Bot, F
+from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
-from aiogram.filters import Command, StateFilter
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+import random
 
 import app.keyboards.UserKb as kbus
 import app.keyboards.AdminConf as AD
 from app.database.requests import (get_users_id, get_service, get_date, 
         get_free_time, set_reserve, get_reserve, del_reserve, get_media, 
-        update_media, update_service, set_service, del_service, get_user)
+        update_media, update_service, set_service, del_service, get_user, 
+        set_workday, get_workday, delete_workday, set_user, del_user, get_user_for_admin)
 from app.state import (DeleteAdminReserve, ReserveServiceAdmin, 
                         Newsletter, NewMedia, ChangeService, NewService, 
-                        DeleteService, RemindReserve)
+                        DeleteService, RemindReserve, AddWorkDay, CreateNewUser)
 
 router_admin = Router()
 
@@ -32,7 +34,7 @@ async def call_admin(message: Message, state: FSMContext):
     await message.delete()
     await state.clear()
     print(message.from_user.id)
-    if message.from_user.id == 6812714026:
+    if message.from_user.id in [6812714026, 780621902]:
         await MainMenu(message)
 
 #region View Reserve
@@ -41,7 +43,7 @@ async def view_record(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
     await state.clear()
-    text = await get_reserve("admin")
+    text = await get_reserve()
     if text:
         await callback.message.answer(f"{AD.answer_text(text)}", reply_markup=kbus.keyboard({"Ок": "adminmenu"}, 1))
     else:
@@ -55,7 +57,7 @@ async def delete_reserve(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
     await state.clear()
-    text = await get_reserve("admin")
+    text = await get_reserve()
     if text:
         text["Отмена"] = "adminmenu"
         await state.set_state(DeleteAdminReserve.reserve_id)
@@ -152,23 +154,34 @@ async def apply_reserve(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await callback.message.answer(f"Подтверждаете запись?\n" 
                                 f"{data['name_service']} на {data['day']} в {data['time_start']}:00", 
-                                reply_markup=kbus.keyboard(AD.answer("doneA_1", "doneA_0"), 2))
+                                reply_markup=kbus.keyboard(AD.answer("doneA_1", "adminmenu"), 2))
     
 
-@router_admin.callback_query(ReserveServiceAdmin.day_id)
+@router_admin.callback_query(F.data.startswith('doneA_'))
+async def done_reserve_id(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.set_state(ReserveServiceAdmin.time_work)
+    users = await get_user_for_admin()
+    if users:
+        users["Отмена"] = "adminmenu"
+        await callback.message.answer("Выбери Юзера", reply_markup=kbus.keyboard(users, 2))
+    else:
+        await callback.message.answer("Юзеров нет", reply_markup=kbus.keyboard({"Отлично": "adminmenu"}, 1))
+
+
+@router_admin.callback_query(F.data.startswith('userize_'))
 async def done_reserve(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
-    answer = callback.data.split('_')[1]
-    if answer == '1':
-        data = await state.get_data()
-        reserve = await set_reserve(callback.from_user.id, data["service"], data["day_id"], data['time_start'], data['time_work'])
-        if reserve:
-            await state.clear()
-            await callback.message.answer("Твоя записи сохранилась", reply_markup=kbus.keyboard(AD.main_menu, 2))
-        else:
-            await state.clear()
-            await callback.message.answer("Что-то случило попробуй заново!", reply_markup=kbus.keyboard(AD.main_menu, 2))
+    data = await state.get_data()
+    reserve = await set_reserve(callback.data.split('_')[1], data["service"], data["day_id"], data['time_start'], data['time_work'])
+    if reserve:
+        await state.clear()
+        await callback.message.answer("Твоя записи сохранилась", reply_markup=kbus.keyboard({"Отлично": "adminmenu"}, 1))
+    else:
+        await state.clear()
+        await callback.message.answer("Что-то случило попробуй заново!", reply_markup=kbus.keyboard({"Плохо": "adminmenu"}, 1))
 #endregion
 
 #region Newsletter
@@ -249,9 +262,10 @@ async def send_newsletter(callback: CallbackQuery, state: FSMContext):
 
 #region Change Media
 @router_admin.callback_query(F.data.startswith("update_media"))
-async def choice_media(callback: CallbackQuery):
+async def choice_media(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
+    await state.clear()
     text = {"Основное": "mainPH", "Прайс": "pricePH", "Отмена": "adminmenu"}
     await callback.message.answer("Какое фото ты хочешь изменить?", reply_markup=kbus.keyboard(text, 2))
 
@@ -379,10 +393,10 @@ async def complete_change_service(message: Message, state: FSMContext):
     data = await state.get_data()
     await state.set_state(NewService.price)
     await message.answer(f"Новое название {data["name"]}\n Новое время {data["time"]}\n Новая цена {data["price"]}\n Подтверждаем?",
-                         reply_markup=kbus.keyboard(AD.answer("change_2", "adminmenu"), 2))
+                         reply_markup=kbus.keyboard(AD.answer("changeser_2", "adminmenu"), 2))
     
 
-@router_admin.callback_query(F.data.startswith("change_"))
+@router_admin.callback_query(F.data.startswith("changeser_"))
 async def update_service(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
@@ -438,12 +452,14 @@ async def complete_delete(callback: CallbackQuery, state: FSMContext):
         print(e)
 #endregion
 
+
+#region Send Remind
 @router_admin.callback_query(F.data.startswith("remind"))
 async def remind_reserve(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
     await state.clear()
-    text = await get_reserve("admin")
+    text = await get_reserve()
     text["Отмена"] = "adminmenu"
     if text:
         text["Отмена"] = "adminmenu"
@@ -457,10 +473,11 @@ async def remind_reserve(callback: CallbackQuery, state: FSMContext):
 async def remind_message(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
     await callback.answer()
-    await state.update_data(id_user= callback.data.split('_')[2], 
-                            service= callback.data.split('_')[3],
-                            date= callback.data.split('_')[4],
-                            time=callback.data.split('_')[5],)
+    request = await get_reserve(reserve_id=callback.data.split('_')[1])
+    await state.update_data(id_user= request["user_id"], 
+                            service= request["service"],
+                            date= request["date"],
+                            time=request["time"],)
     await state.set_state(RemindReserve.message)
     data = await state.get_data()
     user = await get_user(data["id_user"])
@@ -475,4 +492,151 @@ async def remind_message_apply(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     await callback.bot.send_message(chat_id=data["id_user"], text=data["message"])
     await callback.message.answer(f"Твое сообщение успешно отправлено!", reply_markup=kbus.keyboard({"Отлично": "adminmenu"}, 1))
+#endregion
+
+
+#region Add Work Day
+@router_admin.callback_query(F.data.startswith("add_work_day"))
+async def add_work_day(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.clear()
+    await state.set_state(AddWorkDay.day)
+    await callback.message.answer("Напиши дату\nПример '20 января'")
+
+@router_admin.message(AddWorkDay.day)
+async def add_work_day_day(message: Message, state: FSMContext):
+    await state.update_data(day=message.text)
+    await state.set_state(AddWorkDay.start)
+    await message.answer(f"Отлично выбран день {message.text}\nТеперь пиши начало рабочего периода:")
+
+@router_admin.message(AddWorkDay.start)
+async def add_work_day_start(message: Message, state: FSMContext):
+    await state.update_data(start=message.text)
+    await state.set_state(AddWorkDay.end)
+    await message.answer(f"Замечательно\nТеперь пиши конц рабочего периода:")
+
+@router_admin.message(AddWorkDay.end)
+async def add_work_day_end(message: Message, state: FSMContext):
+    await state.update_data(end=message.text)
+    data = await state.get_data()
+    await message.answer(f"Шоколадно\nСохраняем?\nРабочий день {data["day"]}\nC {data["start"]}:00 до {data["end"]}:00",
+                         reply_markup=kbus.keyboard(AD.answer("add_day_new", "adminmenu"), 2))
+    
+@router_admin.callback_query(F.data.startswith("add_day_new"))
+async def new_work_day(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    data = await state.get_data()
+    if await set_workday(data["day"], data["start"], data["end"]):
+        await callback.message.answer("Новый рабочий день создан", reply_markup=kbus.keyboard({"Отлично": "adminmenu"}, 1))
+    else:
+        await callback.message.answer("Что то пошло не так", reply_markup=kbus.keyboard({"Плохо": "adminmenu"}, 1))
+#endregion
+
+#region Remove DateWork
+@router_admin.callback_query(F.data.startswith("remove_work_day"))
+async def remove_work_day(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.clear()
+    text = await get_workday()
+    if text:
+        text["Отмена"] = "adminmenu"
+        await callback.message.answer("Выбери день:", reply_markup=kbus.keyboard(text, 1))
+    else:
+        await callback.message.answer("Рабочих дней нет", reply_markup=kbus.keyboard({"Ок": "adminmenu"}, 1))
+
+
+@router_admin.callback_query(F.data.startswith("dateworkid_"))
+async def apply_remove_work_day(callback: CallbackQuery):
+    await callback.message.delete()
+    await callback.answer()
+    data = callback.data.split('_')[1]
+    text = await get_workday(data)
+    if text:
+        text["Отмена"] = "adminmenu"
+        await callback.message.answer(f"Удаляем?\n{list(text.keys())[0]}", reply_markup=kbus.keyboard(AD.answer(f"{list(text.values())[0]}", "adminmenu"), 2))
+    else:
+        await callback.message.answer("Ошибка", reply_markup=kbus.keyboard({"Ок": "adminmenu"}, 1))
+
+
+@router_admin.callback_query(F.data.startswith("remove_day_id_"))
+async def remove_work_day_complete(callback: CallbackQuery):
+    await callback.message.delete()
+    await callback.answer()
+    data = callback.data.split('_')[3]
+    print(data)
+    if await delete_workday(data):
+        await callback.message.answer("Рабочий день успешно удален", reply_markup=kbus.keyboard({"Зафиксировал": "adminmenu"}, 1))
+    else:
+        await callback.message.answer("Рабочий день не удален", reply_markup=kbus.keyboard({"Писос": "adminmenu"}, 1))
+#endregion
+
+#region View DateWork
+@router_admin.callback_query(F.data.startswith("view_date_work"))
+async def remove_work_day_complete(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.clear()
+    days = await get_workday()
+    if days:
+        text = "Твои рабочие дни:\n"
+        for day in days:
+            text += f"{day}\n"
+    else:
+        text = "Рабочих дней еще нет!"
+    await callback.message.answer(text, reply_markup=kbus.keyboard({"Хороши!": "adminmenu"}, 1))
+#endregion
+
+#region Create NewUser
+@router_admin.callback_query(F.data.startswith("new_user_create"))
+async def create_new_user(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.clear()
+    await state.set_state(CreateNewUser.name)
+    await callback.message.answer("Напиши имя пользователя:")
+
+
+@router_admin.message(CreateNewUser.name)
+async def create_name_user(message: Message, state: FSMContext):
+    await message.delete()
+    tg_id = random.randint(1000, 1000000)
+    tg_id = "<" + str(tg_id)
+    if await set_user(tg_id, None, message.text + "(Fake)"):
+        await message.answer("Юзер создан", reply_markup=kbus.keyboard({"Хорошо": "adminmenu"}, 1))
+    else:
+        await message.answer("Что то не так", reply_markup=kbus.keyboard({"Плохо": "adminmenu"}, 1))
+#endregion
+
+#region Remove User Fake
+@router_admin.callback_query(F.data.startswith("remove_user_create"))
+async def remove_new_user(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.clear()
+    users = await get_user()
+    if users:
+        users["Отмена"] = "adminmenu"
+        await callback.message.answer("Выбери какого пользователя удалять", reply_markup=kbus.keyboard(users, 1))
+    else:
+        await callback.message.answer("Юзеры не найдены", reply_markup=kbus.keyboard({"Ок": "adminmenu"}, 1))
+
+
+@router_admin.callback_query(F.data.startswith("usre_"))
+async def remove_new_user_apply(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.clear()
+    tg_id = callback.data.split('_')[1]
+    if await del_user(tg_id):
+        await callback.message.answer("Юзер удален", reply_markup=kbus.keyboard({"Хорошо": "adminmenu"}, 1))
+    else:
+        await callback.message.answer("Что то не так", reply_markup=kbus.keyboard({"Плохо": "adminmenu"}, 1))
+
+
+
+
+
 

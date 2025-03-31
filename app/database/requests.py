@@ -1,5 +1,5 @@
 from sqlalchemy import update, select, delete
-
+from sqlalchemy import cast, String
 from .models import User, DateWork, Service, Reserve, Media
 from .models import async_session
 
@@ -13,11 +13,41 @@ def connection(func):
 
 #region User
 @connection
-async def get_user(session, tg_id):
-    user = await session.scalar(select(User).where(User.tg_id == tg_id))
-    if user:
-        return user.name
-    return False
+async def get_user(session, tg_id = None):
+    if tg_id:
+        user = await session.scalar(select(User).where(User.tg_id == tg_id))
+        if user:
+            return user.name
+        return False
+    else:
+        try:
+            users = await session.scalars(select(User))
+            text = {}
+            for user in users:
+                print(str(user.tg_id))
+                if str(user.tg_id).startswith("<"):
+                    text[user.name] = f"usre_{user.tg_id}"
+                print(text)
+            return text
+        except Exception as e:
+            print(e)
+            return False
+        
+@connection
+async def get_user_for_admin(session):
+    try:
+        users = await session.scalars(select(User))
+        text = {}
+        for user in users:
+            print(str(user.tg_id))
+            if str(user.tg_id).startswith("<"):
+                text[user.name] = f"userize_{user.tg_id}"
+            print(text)
+        return text
+    except Exception as e:
+        print(e)
+        return False
+        
 
 @connection
 async def set_user(session, tg_id, username, name):
@@ -35,13 +65,16 @@ async def set_user(session, tg_id, username, name):
 async def update_user(session, tg_id, name):
     try:
         user = update(User).where(User.tg_id == tg_id).values(name=name)
-        if user:
-            await session.execute(user)
+        result = await session.execute(user)
+        if result.rowcount > 0:
             await session.commit()
             return True
         else:
+            await session.rollback()
             return False
-    except:
+    except Exception as e:
+        print(e)
+        await session.rollback()
         return False
     
 @connection
@@ -69,7 +102,8 @@ async def get_users_id(session):
     answer = []
     users = await session.scalars(select(User))
     for user in users:
-        answer.append(user.tg_id)
+        if isinstance(user.tg_id, int):
+            answer.append(user.tg_id)
     return answer
 #endregion
 
@@ -199,17 +233,27 @@ async def set_reserve(session, user_id, service_id, time_work_id, time_start, ti
         return False
     
 @connection
-async def get_reserve(session, user_id):
+async def get_reserve(session, user_id = None, reserve_id = None):
     print("get_reserve")
     text = {}
-    if user_id == "admin":
+    if not user_id and not reserve_id:
         reserves = await session.scalars(select(Reserve))
         for reserve in reserves:
             day = await session.scalar(select(DateWork).where(DateWork.id == reserve.time_work_id))
             user = await session.scalar(select(User.name).where(User.tg_id == reserve.user_id))
             service = await session.scalar(select(Service.name_service).where(Service.id == reserve.service_id))
-            text[f"{user} - {service}: {day.date} {reserve.time_start}:00"] = f"dateId_{reserve.id}_{reserve.user_id}_{service}_{day.date}_{reserve.time_start}:00"
-
+            text[f"{user} {service}: {day.date} {reserve.time_start}:00"] = f"dateId_{reserve.id}"
+    if reserve_id:
+        reserve = await session.scalar(select(Reserve).where(Reserve.id == reserve_id))
+        day = await session.scalar(select(DateWork).where(DateWork.id == reserve.time_work_id))
+        user = await session.scalar(select(User.name).where(User.tg_id == reserve.user_id))
+        service = await session.scalar(select(Service.name_service).where(Service.id == reserve.service_id))
+        text = {
+                "user_id": reserve.user_id,
+                "service": service,
+                "date": day.date,
+                "time": f"{reserve.time_start}:00",
+        }
     else:
         reserves = await session.scalars(select(Reserve).where(Reserve.user_id == user_id))
         for reserve in reserves:
@@ -261,4 +305,62 @@ async def update_media(session, appointment, url):
         await session.rollback()
         return False
     
+#endregion
+
+#region WorkDay
+@connection
+async def set_workday(session, date, start, end):
+    try:
+        workday = DateWork(date= date, start= start, end= end)
+        session.add(workday)
+        await session.commit()
+        return True
+    except Exception as e:
+        print(e)
+        return False
+    
+@connection 
+async def get_workday(session, id_day=None):
+    text = {}
+    if not id_day:
+        try:
+            workdays = await session.scalars(select(DateWork))
+            for day in workdays:
+                key = f"{day.date} {day.start}:00 - {day.end}:00"
+                value = f"dateworkid_{day.id}"
+                text[key] = value
+                print(text)
+            return text
+        except Exception as e:
+            print(e)
+            return False
+    else:
+        workday = await session.scalar(select(DateWork).where(DateWork.id == id_day))
+        text[f"{workday.date}, {workday.start}:00 - {workday.end}:00"] = f"remove_day_id_{id_day}"
+        return text
+    
+@connection
+async def delete_workday(session, id_day):
+    try:
+        date = delete(DateWork).where(DateWork.id == id_day)
+        result = await session.execute(date)
+        if result.rowcount > 0:
+            await session.commit()
+            reserve = delete(Reserve).where(Reserve.time_work_id == id_day)
+            result = await session.execute(reserve)
+            if result.rowcount > 0:
+                await session.commit()
+            return True
+        else:
+            await session.rollback()
+            return False
+    except Exception as e:
+        print(e)
+        await session.rollback()
+        return False
+
+
+
+
+
 #endregion

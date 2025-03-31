@@ -7,6 +7,11 @@ main_menu = {
             "Обновить услуги": "update_service",
             "Удалить услугу": "delete_service",
             "Напомнить о записи": "remind",
+            "Добавить день": "add_work_day",
+            "Удалить день": "remove_work_day",
+            "Мои рабочие дни": "view_date_work",
+            "Новый Юзер": "new_user_create",
+            "Удалить Юзера": "remove_user_create",
             }
 
 

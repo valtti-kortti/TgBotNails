@@ -20,7 +20,6 @@ class DeleteAdminReserve(StatesGroup):
     reserve_id = State()
     apply = State()
 
-
 class ReserveServiceAdmin(StatesGroup):
     service = State()
     day = State()
@@ -28,7 +27,6 @@ class ReserveServiceAdmin(StatesGroup):
     time_work = State()
     day_id = State()
     name_service = State()
-
 
 class Newsletter(StatesGroup):
     text = State()
@@ -62,3 +60,11 @@ class RemindReserve(StatesGroup):
     service = State()
     date = State()
     time = State()
+
+class AddWorkDay(StatesGroup):
+    day = State()
+    start = State()
+    end = State()
+
+class CreateNewUser(StatesGroup):
+    name = State()
