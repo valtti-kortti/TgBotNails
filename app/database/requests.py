@@ -208,7 +208,7 @@ async def get_reserve(session, user_id):
             day = await session.scalar(select(DateWork).where(DateWork.id == reserve.time_work_id))
             user = await session.scalar(select(User.name).where(User.tg_id == reserve.user_id))
             service = await session.scalar(select(Service.name_service).where(Service.id == reserve.service_id))
-            text[f"{user} - {service}: {day.date} {reserve.time_start}:00"] = f"dateId_{reserve.id}"
+            text[f"{user} - {service}: {day.date} {reserve.time_start}:00"] = f"dateId_{reserve.id}_{reserve.user_id}_{service}_{day.date}_{reserve.time_start}:00"
 
     else:
         reserves = await session.scalars(select(Reserve).where(Reserve.user_id == user_id))

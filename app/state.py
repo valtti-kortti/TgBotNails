@@ -55,3 +55,10 @@ class NewService(StatesGroup):
 class DeleteService(StatesGroup):
     id_service = State()
     rec = State()
+
+class RemindReserve(StatesGroup):
+    id_user = State()
+    message = State()
+    service = State()
+    date = State()
+    time = State()

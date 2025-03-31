@@ -7,9 +7,10 @@ import app.keyboards.UserKb as kbus
 import app.keyboards.AdminConf as AD
 from app.database.requests import (get_users_id, get_service, get_date, 
         get_free_time, set_reserve, get_reserve, del_reserve, get_media, 
-        update_media, update_service, set_service, del_service)
+        update_media, update_service, set_service, del_service, get_user)
 from app.state import (DeleteAdminReserve, ReserveServiceAdmin, 
-                        Newsletter, NewMedia, ChangeService, NewService, DeleteService)
+                        Newsletter, NewMedia, ChangeService, NewService, 
+                        DeleteService, RemindReserve)
 
 router_admin = Router()
 
@@ -433,4 +434,45 @@ async def complete_delete(callback: CallbackQuery, state: FSMContext):
         else:
             await callback.message.answer("Что то не так!", reply_markup=kbus.keyboard({"Плохо": "adminmenu"}, 1))
     except Exception as e:
+        await callback.message.answer("Что то не так!", reply_markup=kbus.keyboard({"Плохо": "adminmenu"}, 1))
         print(e)
+#endregion
+
+@router_admin.callback_query(F.data.startswith("remind"))
+async def remind_reserve(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.clear()
+    text = await get_reserve("admin")
+    text["Отмена"] = "adminmenu"
+    if text:
+        text["Отмена"] = "adminmenu"
+        await state.set_state(RemindReserve.id_user)
+        await callback.message.answer("Выбери кому ты хочешь отправить напоминание", reply_markup=kbus.keyboard(text, 1))
+    else:
+        await callback.message.answer("Записей нет", reply_markup=kbus.keyboard({"Плохо": "adminmenu"}, 1))
+
+
+@router_admin.callback_query(RemindReserve.id_user)
+async def remind_message(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    await state.update_data(id_user= callback.data.split('_')[2], 
+                            service= callback.data.split('_')[3],
+                            date= callback.data.split('_')[4],
+                            time=callback.data.split('_')[5],)
+    await state.set_state(RemindReserve.message)
+    data = await state.get_data()
+    user = await get_user(data["id_user"])
+    text = f"Привет {user}!\nНапоминаю тебе, о записи на процедуру: {data["service"]}\n{data["date"]} в {data["time"]}"
+    await state.update_data(message=text)
+    await callback.message.answer(f"Твое сообщение\n{text}\nОтправляем?", reply_markup=kbus.keyboard(AD.answer("rem_message", "adminmenu"), 2))
+
+@router_admin.callback_query(F.data.startswith("rem_message"))
+async def remind_message_apply(callback: CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await callback.answer()
+    data = await state.get_data()
+    await callback.bot.send_message(chat_id=data["id_user"], text=data["message"])
+    await callback.message.answer(f"Твое сообщение успешно отправлено!", reply_markup=kbus.keyboard({"Отлично": "adminmenu"}, 1))
+
