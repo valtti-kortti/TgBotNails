@@ -272,6 +272,8 @@ async def choice_media(callback: CallbackQuery, state: FSMContext):
 
 @router_admin.callback_query(F.data.startswith("mainPH"))
 async def main_ph_change(callback: CallbackQuery):
+    await callback.message.delete()
+    await callback.answer()
     photo = await get_media("main")
     await callback.message.answer_photo(photo, "Меняем?", reply_markup=kbus.keyboard(AD.answer("main_change", "adminmenu"), 2))
 
@@ -279,6 +281,7 @@ async def main_ph_change(callback: CallbackQuery):
 @router_admin.callback_query(F.data.startswith("main_change"))
 async def main_ph_change(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
+    await callback.answer()
     await state.set_state(NewMedia.main)
     await callback.message.answer("Пришли новое фото:")
 
@@ -294,6 +297,8 @@ async def complete_main(message: Message):
 
 @router_admin.callback_query(F.data.startswith("pricePH"))
 async def main_ph_change(callback: CallbackQuery):
+    await callback.message.delete()
+    await callback.answer()
     photo = await get_media("price")
     await callback.message.answer_photo(photo, "Меняем?", reply_markup=kbus.keyboard(AD.answer("price_change", "adminmenu"), 2))
 
@@ -301,6 +306,7 @@ async def main_ph_change(callback: CallbackQuery):
 @router_admin.callback_query(F.data.startswith("price_change"))
 async def main_ph_change(callback: CallbackQuery, state: FSMContext):
     await callback.message.delete()
+    await callback.answer()
     await state.set_state(NewMedia.price)
     await callback.message.answer("Пришли новое фото:")
 
