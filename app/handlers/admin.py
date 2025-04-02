@@ -21,7 +21,6 @@ Admins = os.getenv("Admins")
 router_admin = Router()
 
 async def MainMenu(message: Message):
-    print("adminmenu")
     await message.answer("Выбери действие:", reply_markup=kbus.keyboard(AD.main_menu, 2))
 
 
@@ -37,8 +36,7 @@ async def call_main(callback: CallbackQuery, state: FSMContext):
 async def call_admin(message: Message, state: FSMContext):
     await message.delete()
     await state.clear()
-    print(message.from_user.id)
-    if message.from_user.id in Admins:
+    if message.from_user.id == int(Admins):
         await MainMenu(message)
 
 #region View Reserve

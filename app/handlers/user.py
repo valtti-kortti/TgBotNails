@@ -16,7 +16,8 @@ router_user = Router()
 async def MainMenu(message: Message, tg_id):
     user = await get_user(tg_id)
     if user:
-        await message.answer_photo(await get_media("main"), f"Привет, {user}", reply_markup=kbus.keyboard(US.main_menu, 2))
+        await message.answer_photo(await get_media("main"), f"Привет, {user}!\nХочешь маникюрчик?\nТогда скорее записывайся"
+                                   , reply_markup=kbus.keyboard(US.main_menu, 2))
     else:
         await message.answer("Регистрируемся?", reply_markup=kbus.keyboard(US.answer("reg_1", "reg_0"), 2))
 
@@ -121,7 +122,8 @@ async def choice_service(callback: CallbackQuery, state: FSMContext):
     text = await get_service()
     if text:
         text["Отмена"] = "mainmenu1"
-        await callback.message.answer_photo(await get_media("price"), "Выбирай услугу:", reply_markup=kbus.keyboard(text, 2))
+        await callback.message.answer_photo(await get_media("price"), "Выбирай что будем делать:"
+                                            , reply_markup=kbus.keyboard(text, 2))
     else:
         await callback.message.answer("Извини, но сейчас рабочих дней нет(", reply_markup=kbus.keyboard({"Ок": "mainmenu1"}, 1))
     
@@ -189,7 +191,7 @@ async def done_reserve(callback: CallbackQuery, state: FSMContext):
             await state.clear()
             await callback.bot.send_message(chat_id=780621902, text=f" Пользователь {await get_user(callback.from_user.id)}\n"
                                             f"{data['name_service']} на {data['day']} в {data['time_start']}:00")
-            await callback.message.answer("Твоя записи сохранилась", reply_markup=kbus.keyboard({"Отлично!": "mainmenu1"}, 1))
+            await callback.message.answer("Твоя запись сохранилась", reply_markup=kbus.keyboard({"Отлично!": "mainmenu1"}, 1))
         else:
             await state.clear()
             await callback.message.answer("Что-то случило попробуй заново!", reply_markup=kbus.keyboard({"Ок": "mainmenu1"}, 1))
