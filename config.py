@@ -1,3 +1,0 @@
-#Token Bot
-BotToken = "8115591921:AAG0z8tvaX73XmEVc7rLzdxIVpDfd2nDKAc"
-reg_sticker = 'CAACAgIAAxkBAAIK2WfkbgKOtWQq45JkYnXtfm6ZPusmAAKkAQACD5VFEM0hiVkv2iSrNgQ'

@@ -7,7 +7,6 @@ import app.keyboards.UserKb as kbus
 from app.database.requests import (get_user, set_user, update_user, del_user, 
         get_service, get_date, get_free_time, set_reserve, 
         get_reserve, del_reserve, get_media)
-from config import reg_sticker
 import app.keyboards.UserConf as US
 from app.state import RegUser, UpdateUser, ReserveService
 

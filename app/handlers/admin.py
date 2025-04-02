@@ -2,7 +2,9 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from dotenv import load_dotenv
 import random
+import os
 
 import app.keyboards.UserKb as kbus
 import app.keyboards.AdminConf as AD
@@ -14,6 +16,8 @@ from app.state import (DeleteAdminReserve, ReserveServiceAdmin,
                         Newsletter, NewMedia, ChangeService, NewService, 
                         DeleteService, RemindReserve, AddWorkDay, CreateNewUser)
 
+load_dotenv(".env")
+Admins = os.getenv("Admins")
 router_admin = Router()
 
 async def MainMenu(message: Message):
@@ -34,7 +38,7 @@ async def call_admin(message: Message, state: FSMContext):
     await message.delete()
     await state.clear()
     print(message.from_user.id)
-    if message.from_user.id in [6812714026, 780621902]:
+    if message.from_user.id in Admins:
         await MainMenu(message)
 
 #region View Reserve
@@ -354,7 +358,7 @@ async def change_time_service(message: Message, state: FSMContext):
     await state.update_data(name= message.text)
     data = await state.get_data()
     await state.set_state(ChangeService.time)
-    await message.answer(f"Введи новое время работы \n Старое время '{data["time"]}'")
+    await message.answer(f"Введи новое время работы \n Старое время '{data['time']}'")
 
 
 @router_admin.message(NewService.name)
@@ -371,7 +375,7 @@ async def change_price_service(message: Message, state: FSMContext):
     await state.update_data(time= message.text)
     data = await state.get_data()
     await state.set_state(ChangeService.price)
-    await message.answer(f"Введи новую цену \n Старая цена '{data["price"]}'")
+    await message.answer(f"Введи новую цену \n Старая цена '{data['price']}'")
 
 
 @router_admin.message(NewService.time)
@@ -388,7 +392,7 @@ async def complete_change_service(message: Message, state: FSMContext):
     await state.update_data(price= message.text)
     data = await state.get_data()
     await state.set_state(ChangeService.price)
-    await message.answer(f"Новое название {data["name"]}\n Новое время {data["time"]}\n Новая цена {data["price"]}\n Подтверждаем?",
+    await message.answer(f"Новое название {data['name']}\n Новое время {data['time']}\n Новая цена {data['price']}\n Подтверждаем?",
                          reply_markup=kbus.keyboard(AD.answer("change_1", "adminmenu"), 2))
     
 
@@ -398,7 +402,7 @@ async def complete_change_service(message: Message, state: FSMContext):
     await state.update_data(price= message.text)
     data = await state.get_data()
     await state.set_state(NewService.price)
-    await message.answer(f"Новое название {data["name"]}\n Новое время {data["time"]}\n Новая цена {data["price"]}\n Подтверждаем?",
+    await message.answer(f"Новое название {data['name']}\n Новое время {data['time']}\n Новая цена {data['price']}\n Подтверждаем?",
                          reply_markup=kbus.keyboard(AD.answer("changeser_2", "adminmenu"), 2))
     
 
@@ -487,7 +491,7 @@ async def remind_message(callback: CallbackQuery, state: FSMContext):
     await state.set_state(RemindReserve.message)
     data = await state.get_data()
     user = await get_user(data["id_user"])
-    text = f"Привет {user}!\nНапоминаю тебе, о записи на процедуру: {data["service"]}\n{data["date"]} в {data["time"]}"
+    text = f"Привет {user}!\nНапоминаю тебе, о записи на процедуру: {data['service']}\n{data['date']} в {data['time']}"
     await state.update_data(message=text)
     await callback.message.answer(f"Твое сообщение\n{text}\nОтправляем?", reply_markup=kbus.keyboard(AD.answer("rem_message", "adminmenu"), 2))
 
@@ -526,7 +530,7 @@ async def add_work_day_start(message: Message, state: FSMContext):
 async def add_work_day_end(message: Message, state: FSMContext):
     await state.update_data(end=message.text)
     data = await state.get_data()
-    await message.answer(f"Шоколадно\nСохраняем?\nРабочий день {data["day"]}\nC {data["start"]}:00 до {data["end"]}:00",
+    await message.answer(f"Шоколадно\nСохраняем?\nРабочий день {data['day']}\nC {data['start']}:00 до {data['end']}:00",
                          reply_markup=kbus.keyboard(AD.answer("add_day_new", "adminmenu"), 2))
     
 @router_admin.callback_query(F.data.startswith("add_day_new"))

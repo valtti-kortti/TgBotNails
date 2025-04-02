@@ -1,9 +1,13 @@
 from sqlalchemy import String, Integer, BigInteger, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine, AsyncSession
+from dotenv import load_dotenv, find_dotenv
+import os
 
-
-engine = create_async_engine(url='sqlite+aiosqlite:///db.sqlite3')
+load_dotenv()
+BaseData = os.getenv("BaseData")
+print(BaseData)
+engine = create_async_engine(url=BaseData)
 async_session = async_sessionmaker(engine, class_=AsyncSession)
 
 class Base(AsyncAttrs, DeclarativeBase):
