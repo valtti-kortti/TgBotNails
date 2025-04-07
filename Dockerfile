@@ -3,11 +3,10 @@ FROM python:3.11-slim
 
 # Установка рабочей директории внутри контейнера
 WORKDIR /app
+VOLUME  "bd.sqlite3"
 
-# Копирование файлов проекта
+
 COPY . .
-
-# Установка зависимостей
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Команда для запуска приложения

@@ -1366,3 +1366,11 @@ TypeError: 'in <string>' requires string as left operand, not int
 2025-04-03 00:12:43,155 - aiogram.dispatcher - INFO - Run polling for bot @ArinaDurilaBot id=7863503801 - 'Арина дурила и маникюрчик'
 2025-04-03 00:12:45,373 - aiogram.dispatcher - INFO - Polling stopped
 2025-04-03 00:12:45,626 - aiogram.dispatcher - INFO - Polling stopped for bot @ArinaDurilaBot id=7863503801 - 'Арина дурила и маникюрчик'
+2025-04-06 03:05:49,712 - aiogram.dispatcher - INFO - Start polling
+2025-04-06 03:05:49,770 - aiogram.dispatcher - INFO - Run polling for bot @ArinaDurilaBot id=7863503801 - 'Арина дурила и маникюрчик'
+2025-04-06 03:05:54,516 - aiogram.dispatcher - INFO - Polling stopped
+2025-04-06 03:05:54,774 - aiogram.dispatcher - INFO - Polling stopped for bot @ArinaDurilaBot id=7863503801 - 'Арина дурила и маникюрчик'
+2025-04-06 03:19:14,177 - aiogram.dispatcher - INFO - Start polling
+2025-04-06 03:19:14,232 - aiogram.dispatcher - INFO - Run polling for bot @ArinaDurilaBot id=7863503801 - 'Арина дурила и маникюрчик'
+2025-04-06 03:19:19,095 - aiogram.dispatcher - INFO - Polling stopped
+2025-04-06 03:19:19,355 - aiogram.dispatcher - INFO - Polling stopped for bot @ArinaDurilaBot id=7863503801 - 'Арина дурила и маникюрчик'
